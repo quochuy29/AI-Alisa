@@ -1,0 +1,61 @@
+{
+  "name": "requirement-commands",
+  "version": "1.1.0",
+  "description": "CLI scaffolding tool for installing requirement slash commands to Claude Code and Cursor editors (Phase 1: init-only mode)",
+  "type": "module",
+  "main": "./dist/cli/index.js",
+  "bin": {
+    "requirement-commands": "./bin/requirement-commands.js"
+  },
+  "files": [
+    "bin",
+    "dist",
+    "src/templates"
+  ],
+  "scripts": {
+    "build": "node build.js",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "postinstall": "node scripts/postinstall.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "requirements",
+    "ai",
+    "coding",
+    "agents",
+    "claude",
+    "cursor",
+    "cline",
+    "cli",
+    "scaffolding",
+    "templates"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.8.0",
+    "chalk": "^5.5.0",
+    "commander": "^12.1.0",
+    "ora": "^8.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "eslint": "^9.39.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.50.0",
+    "vite": "^5.4.21",
+    "vitest": "^2.1.9"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourorg/requirement-commands.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourorg/requirement-commands/issues"
+  },
+  "homepage": "https://github.com/yourorg/requirement-commands#readme"
+}
