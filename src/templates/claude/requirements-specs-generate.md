@@ -1,0 +1,353 @@
+---
+description: Generate design document and implementation tasks
+allowed-tools: Bash(*), Read(*), Write(*), AskUserQuestion(*), Agent(*)
+---
+
+# Requirements Specs Generate
+
+Generate executable specification files (`07-design.md`, `08-tasks.md`) from completed requirements.
+
+---
+
+## 🎯 CONTEXT ENGINEERING ARCHITECTURE
+
+**Research-Backed Design**: "Design-First, Task-Subagent" pattern for optimal context quality.
+
+### The Problem: Context Rot
+
+When design generation and task generation happen in the same session:
+- Design validation loop accumulates revision history (3-5 rounds)
+- By task generation time, 60-70% of context is "noise" (revision artifacts)
+- Task quality degrades due to "context rot" (NoLiMa benchmark, 2025)
+
+### The Solution: Session Isolation
+
+```
+MAIN SESSION
+├── Phase A: Load requirements (00-06)
+├── Phase B: Generate 07-design.md
+├── Phase C: Design validation loop (interactive, may iterate)
+└── Phase D: Checkpoint → user chooses inline or fresh session
+
+FRESH SESSION (recommended)
+└── Generate 08-tasks.md from ONLY: design + requirements + patterns
+    (NO conversation history, NO revision artifacts)
+```
+
+---
+
+## Usage
+
+```
+/requirements-specs-generate
+/requirements-specs-generate requirements/2025-11-08-1921-feature-name
+```
+
+## Prerequisites
+
+- Must have a completed requirements gathering session
+- Files `00-06` must exist in the requirement folder
+- `06-requirements-spec.md` must be complete
+- Files `07-08` must NOT already exist (or user confirms overwrite)
+
+---
+
+## Phase A: Session Setup
+
+1. Read `requirements/.current-requirement` OR use explicit path argument
+2. Read `metadata.json` → determine state:
+
+   | State | Phase | Action |
+   |-------|-------|--------|
+   | Requirements complete | `requirements_complete` | Full flow (B→C→D) |
+   | Design approved, tasks pending | `design_approved` | Skip to task generation |
+   | Specs complete | `specs_complete` | Show error: "use /requirements-specs-execute" |
+
+3. Load source files: `06-requirements-spec.md`, `03-context-findings.md`, `05-detail-answers.md`
+
+If **design_approved** state detected:
+```
+═══════════════════════════════════════════════════════════════════
+RESUMING FROM APPROVED DESIGN
+═══════════════════════════════════════════════════════════════════
+
+✅ 07-design.md already approved (skipping design phase)
+📋 Generating 08-tasks.md with FRESH context
+
+This session has 100% clean context for optimal task quality.
+═══════════════════════════════════════════════════════════════════
+```
+→ Skip to Phase D.1
+
+---
+
+## Phase B: Design Generation
+
+4. Generate `07-design.md` with structure:
+   ```markdown
+   # Design Document: [Feature Name]
+   ## Overview
+   ## Architecture
+   ### High-Level Flow (Mermaid diagram)
+   ### Integration Points
+   ## Components and Interfaces
+   ## Data Models
+   ## Error Handling
+   ## Testing Strategy
+   ## Algorithm Details
+   ```
+5. Write file immediately (checkpoint)
+6. Update `metadata.json`: `designGenerated: true`
+
+---
+
+## Phase C: Design Validation Loop (Interactive — MANDATORY)
+
+7. Display design overview (section headers + key decisions)
+8. Ask for approval via AskUserQuestion tool:
+
+```
+AskUserQuestion("📐 Design Generated — Please review and approve:", [
+  "Yes — Approve design, proceed to task generation",
+  "Minor tweaks — small changes needed (I'll ask what)",
+  "Major revision — significant redesign needed",
+  "More detail — expand specific sections"
+])
+```
+→ "Yes…"          : Update `metadata.json`: `designApproved: true`, proceed to Phase D
+→ "Minor tweaks…" : Ask "What minor tweaks would you like?" → update design → loop back
+→ "Major revision…" : Ask "What's wrong with the approach?" → redesign → loop back
+→ "More detail…"  : Ask which sections (see below)
+
+9. Handle responses:
+   - "Yes" → Update `metadata.json`: `designApproved: true, designApprovedAt: ISO-8601`, proceed to Phase D
+   - "Minor tweaks" → Ask: "What minor tweaks would you like?" → update design → loop back to step 8
+   - "Major revision" → Ask: "What's wrong with the approach? What should it include instead?" → redesign → loop back
+   - "More detail" → AskUserQuestion (allow multiple):
+     ```
+     AskUserQuestion("Which sections need more detail?", [
+       "Component architecture — responsibilities, interactions",
+       "Data models — schemas, relationships, validation",
+       "API contracts — endpoints, request/response formats",
+       "Implementation approach — step-by-step, technical decisions"
+     ])
+     ```
+     → Expand selected sections → loop back to step 8
+
+10. **This loop is MANDATORY** — CANNOT proceed without explicit approval
+
+---
+
+## Phase D: Task Generation Strategy
+
+11. After approval, ask:
+
+```
+AskUserQuestion("✅ Design approved and saved. Choose how to generate implementation tasks:", [
+  "Generate now (Recommended) — fresh sub-agent, isolated context, ~40% quality improvement",
+  "Generate later — start a NEW Claude Code session, run /requirements-specs-generate"
+])
+```
+→ "Generate now…" : proceed to Phase D.1
+→ "Generate later…" : proceed to Phase D.2 (checkpoint)
+
+---
+
+## Phase D.1: Task Generation (If "Generate now" chosen)
+
+Show context isolation notice:
+```
+═══════════════════════════════════════════════════════════════════
+CONTEXT ISOLATION — GENERATING WITH FRESH CONTEXT
+═══════════════════════════════════════════════════════════════════
+
+Using ONLY clean inputs:
+✓ 07-design.md (approved)
+✓ 06-requirements-spec.md
+✓ 03-context-findings.md
+
+Ignoring: conversation history, design revision artifacts
+═══════════════════════════════════════════════════════════════════
+```
+
+Use the Agent tool to invoke `task-orchestrator` agent:
+```yaml
+TASK_ORCHESTRATOR_REQUEST:
+  design_path: "[session]/07-design.md"
+  requirements_path: "[session]/06-requirements-spec.md"
+  context_findings_path: "[session]/03-context-findings.md"
+  output_path: "[session]/08-tasks.md"
+```
+The orchestrator will select the appropriate strategy (Sequential / Hierarchical / Adaptive),
+apply tier annotations (`_Agent Level: Junior/Mid/Senior_`) to each task, and write `08-tasks.md`.
+
+**Task Sizing Rules (for orchestrator reference):**
+
+| Component Size | Decomposition |
+|----------------|---------------|
+| ≤350 lines | ONE cohesive task |
+| 350–700 lines | TWO related tasks (Core + Logic) |
+| >700 lines | FIVE vertical slices |
+
+**Vertical Slices (for >700 line components):**
+1. **Data Foundation** — models, schemas, migrations, repositories
+2. **Business Logic** — services, algorithms, workflows, validations
+3. **API/Integration Layer** — endpoints, auth, external services
+4. **User Interface** — components, forms, state binding (if applicable)
+5. **Quality & Polish** — tests, documentation
+
+**Task Template:**
+```markdown
+- [ ] **Task [N]: [Action Verb] [Component] [Outcome]**
+  **Type**: Feature | Infrastructure | Integration | UI | Testing | Documentation
+  **Size**: S (50-150 lines) | M (150-300 lines) | L (300-500 lines)
+  **Dependencies**: Task [X], Task [Y] (or "None")
+
+  **Sub-tasks** (specific file changes):
+  - Create `path/to/file.ext` (~X lines)
+  - Implement `methodName()` with [purpose] (~Y lines)
+  - Add validation: [specific rules] (~Z lines)
+
+  **Acceptance Criteria**:
+  - [ ] [Specific, testable criterion from requirements]
+  - [ ] Tests pass with >80% coverage
+
+  **Verification Method**:
+  - Run: `[test command]`
+  - Check: [what to verify]
+  - Confirm: [expected result]
+
+  _Requirements: FR-X.Y, TR-Z_
+  _Design: 07-design.md § [Section Name]_
+  _Estimated: ~XXX lines_
+```
+
+**Phase Organization:**
+```
+Phase 1: Foundation & Data Layer     (models, migrations, repositories)
+Phase 2: Business Logic & Services   (services, algorithms, workflows)
+Phase 3: API & Integration Layer     (endpoints, auth, external services)
+Phase 4: User Interface              (components, forms — if applicable)
+Phase 5: Testing & Documentation     (tests, docs)
+```
+
+**Pre-output Validation Checklist:**
+- [ ] 85%+ of tasks are 100–500 lines
+- [ ] Each task delivers complete, working functionality (vertical slice)
+- [ ] All FRs and TRs are covered
+- [ ] Dependencies are minimized and acyclic
+- [ ] Each task has specific acceptance criteria
+- [ ] Each task references FR-X/TR-X
+
+---
+
+## Phase D.2: Checkpoint (If "Generate later" chosen)
+
+Update `metadata.json`:
+```json
+{
+  "phase": "design_approved",
+  "specs": {
+    "designGenerated": true,
+    "designApproved": true,
+    "designApprovedAt": "ISO-8601-timestamp",
+    "tasksGenerated": false,
+    "taskGenerationPending": true
+  }
+}
+```
+
+Show:
+```
+═══════════════════════════════════════════════════════════════════
+CHECKPOINT SAVED — DESIGN PHASE COMPLETE
+═══════════════════════════════════════════════════════════════════
+
+✅ 07-design.md approved and saved.
+⏸️  Task generation DEFERRED per your request.
+
+To generate tasks with 100% clean context:
+1. Start a NEW Claude Code session
+2. Run: /requirements-specs-generate
+3. Command will detect approved design → generate tasks only
+
+Session: requirements/[folder]/
+Status: design_approved (tasks pending)
+═══════════════════════════════════════════════════════════════════
+```
+
+**STOP HERE.**
+
+---
+
+## Phase E: Finalization
+
+Update `metadata.json`:
+```json
+{
+  "phase": "specs_complete",
+  "specs": {
+    "designGenerated": true,
+    "designApproved": true,
+    "tasksGenerated": true,
+    "totalTasks": 35,
+    "completedTasks": 0
+  }
+}
+```
+
+Show:
+```
+═══════════════════════════════════════════════════════════════════
+GENERATION COMPLETE
+═══════════════════════════════════════════════════════════════════
+
+Files Generated:
+✓ 07-design.md (approved)
+✓ 08-tasks.md ([N] tasks)
+
+Task Summary:
+- Phase 1: Foundation ([N] tasks)
+- Phase 2: Business Logic ([N] tasks)
+- Phase 3: API Layer ([N] tasks)
+- Phase 4: UI ([N] tasks)
+- Phase 5: Testing ([N] tasks)
+
+Traceability: [N] FRs + [N] TRs → [N] tasks
+
+Ready for execution: /requirements-specs-execute
+(Start a NEW Claude Code session for optimal task execution quality)
+═══════════════════════════════════════════════════════════════════
+```
+
+---
+
+## Finding Requirements in Fresh Session
+
+When starting fresh, the command will:
+
+1. Check `.current-requirement` → use if exists
+2. Scan `requirements/` for sessions with:
+   - `phase: "design_approved"` → **PRIORITY** (task generation pending)
+   - `phase: "requirements_complete"` → needs full specs
+3. If multiple found, list them:
+   ```
+   Found requirements ready for specs generation:
+
+   🔴 TASKS PENDING (approved design):
+   1. 2025-11-08-1921-feature-name (design approved 2h ago)
+
+   🟡 NEEDS FULL SPECS:
+   2. 2025-11-07-1430-another-feature (1 day ago)
+
+   Which requirement? (Enter the number or folder name)
+   ```
+
+---
+
+## Error Handling
+
+- **No active session** → suggest `/requirements-status`
+- **Incomplete requirements** → show missing files, suggest completing
+- **Specs already complete** → "Use /requirements-specs-execute"
+- **User tries to skip validation** → enforce: "Design approval is required before tasks can be generated"
